@@ -238,9 +238,12 @@ public class CdxIndexerWorkflow {
                      System.out.println("Thread:"+threadNumber + ". Number processed:"+numberProcessed +" Number of errors:"+numberErrors);
                      return;                     
                     }
-                   
+                   if (responseBody != null) {
+                       responseBody= responseBody.trim(); //Remove a new line from the server as last character
+                   }
+                    
                     numberProcessed++;
-                    System.out.println("Indexed:"+nextWarcFile +" result:"+responseBody);
+                    System.out.println("Indexed:"+nextWarcFile +" result:"+responseBody); 
                     markWarcFileCompleted(nextWarcFile);
                 }
                 catch(Exception e){
