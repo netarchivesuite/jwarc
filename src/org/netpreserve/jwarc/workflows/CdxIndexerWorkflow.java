@@ -1,9 +1,7 @@
 package org.netpreserve.jwarc.workflows;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.io.PrintStream;
 import java.io.StringWriter;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -22,13 +20,25 @@ import java.util.List;
 
 import org.netpreserve.jwarc.cdx.CdxFormat;
 import org.netpreserve.jwarc.cdx.CdxWriter;
-/*
- * TODO doc.
- * 
- * 
- * Include meta-data warc files?
- * 
- * 
+
+/* 
+The workflow will use the 3 settings for the CDX-indexer automatic.  (digest-unchanged, post-append, warc-full-path, include-revisits)
+
+The workflow takes 4 arguments.
+1) Number of threads
+2) URL to CDX-server
+3) Text file will list of WARC-files to index. (Full filepath, one WARC file on each line)
+4) Text file to output completed WARC-files.
+
+If the indexing workflow is interrupted and stopped, it can just be restarted with the same input WARC-file. It will skip all WARC-files that are listed in the output completed file.
+If the CDX server does not return a http status. (no connection, server dead etc), then the thread will terminate and log this event. This is to avoid 'processing' and mark then completed when they will fail. Some WARC-files will return HTTP error status from the CDX-server, but this is expected and due to corrupt WARC-files. This is mostly old ARC files with http-header errors.
+
+
+Start workflow (24 threads) (replace server url)
+setsid nohup java -Xmx16g -cp jwarc.jar  org.netpreserve.jwarc.workflows.CdxIndexerWorkflow 24 http://server.com:8081/index?badLines=skip /netarkiv-cdx/netarkivet.files.20230705  /netarkiv-cdx/netarkivet.files.20230705.COMPLETED.txt 2>&1 >> cdx_indexer_workflow.lo
+(jwarc.jar will have SNAPSHOT in filename when build, just rename)
+
+Build project with mvn build
  */
 public class CdxIndexerWorkflow {
     private static int NUMBER_OF_THREADS=6;
@@ -103,7 +113,7 @@ public class CdxIndexerWorkflow {
                 continue;
             }
 
-            //Skip metadata
+            //Skip metadata. This is some custom Netarchive Suite/Heritrix information that does not belong in CDX-indexer
             if (next.contains("metadata")) {
                 System.out.println("Skipping metadata file:"+next);
                 continue;
@@ -195,8 +205,7 @@ public class CdxIndexerWorkflow {
 
     private static CdxFormat.Builder createCdxBuilder() {
         CdxFormat.Builder cdxFormatBuilder = new CdxFormat.Builder().        
-                digestUnchanged().
-            //TODO    fullFilePath().        
+                digestUnchanged().        
                 legend(CdxFormat.CDX11_LEGEND);
         return cdxFormatBuilder;
     }
@@ -219,8 +228,17 @@ public class CdxIndexerWorkflow {
             String nextWarcFile=getNextWarcFile();
             while( nextWarcFile != null ){     
                 try{
-                    String cdxOutput=getCdxOutput(nextWarcFile, cdxFormatBuilder);
-                    String responseBody=postCdxToServer(cdxServer, cdxOutput);
+                    String cdxOutput=getCdxOutput(nextWarcFile, cdxFormatBuilder); //Exceptions are acceptable, can be corrupt WARC-files.
+                    String responseBody=null;
+                    try {
+                       responseBody=postCdxToServer(cdxServer, cdxOutput); //Critital
+                    }
+                    catch(Exception e) { //stop thread if CDX server is not running as expected. 
+                     System.err.println("Stopping thread:"+threadNumber + " Error connecting to CDX server:"+e.getMessage());  
+                     System.out.println("Thread:"+threadNumber + ". Number processed:"+numberProcessed +" Number of errors:"+numberErrors);
+                     return;                     
+                    }
+                   
                     numberProcessed++;
                     System.out.println("Indexed:"+nextWarcFile +" result:"+responseBody);
                     markWarcFileCompleted(nextWarcFile);
