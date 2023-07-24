@@ -31,7 +31,8 @@ The workflow takes 4 arguments.
 4) Text file to output completed WARC-files.
 
 If the indexing workflow is interrupted and stopped, it can just be restarted with the same input WARC-file. It will skip all WARC-files that are listed in the output completed file.
-If the CDX server does not return a http status. (no connection, server dead etc), then the thread will terminate and log this event. This is to avoid 'processing' and mark then completed when they will fail. Some WARC-files will return HTTP error status from the CDX-server, but this is expected and due to corrupt WARC-files. This is mostly old ARC files with http-header errors.
+If the CDX server does not return a http status. (no connection, server dead etc), then the thread will terminate and log this event. This is to avoid 'processing' and mark then completed when they will fail. 
+Some WARC-files will return HTTP error status from the CDX-server, but this is expected and due to corrupt WARC-files. This is mostly old ARC files with http-header errors.
 
 
 Start workflow (24 threads) (replace server url)
@@ -39,6 +40,19 @@ setsid nohup java -Xmx16g -cp jwarc.jar  org.netpreserve.jwarc.workflows.CdxInde
 (jwarc.jar will have SNAPSHOT in filename when build, just rename)
 
 Build project with mvn build
+
+Implementation details:
+The list of WARC files to process is read from the input file and stored in List<String>.
+The list of WARC files completed is stored in the output file file stored in HashSet<String> so the contains method is fast.
+
+A syncronized method 'getNextWarcFile' will return next file to process when a thread require a new file.
+If the file is already in the completed set it will just skip returning it and instead try same check for the next file.
+When a WARC file has been completed it will be written to the output file and also add to the memory Set of completed files.
+
+Since the job will take months to complete, regular check not too many threads has been stopped with:
+less cdx_indexer_workflow.log | grep 'Stopping thread'
+So far it has never happened unless when forced by stopping the CDX-server for testing.
+
  */
 public class CdxIndexerWorkflow {
     private static int NUMBER_OF_THREADS=6;
