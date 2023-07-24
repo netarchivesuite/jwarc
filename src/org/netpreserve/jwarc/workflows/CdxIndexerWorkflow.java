@@ -143,10 +143,11 @@ public class CdxIndexerWorkflow {
         List<Path> files = new ArrayList<Path>();
         //TODO file test exists ?
         files.add( new File(warcFile).toPath());
-        try (StringWriter stringWriter = new StringWriter();CdxWriter cdxWriter = new CdxWriter(stringWriter); ) {
-           cdxWriter.onWarning(System.err::println);
+        try (StringWriter stringWriter = new StringWriter();CdxWriter cdxWriter = new CdxWriter(stringWriter); ) {           
+           cdxWriter.setPostAppend(true); //very important for PyWb SOME playback
            cdxWriter.setFormat(cdxFormatBuilder.build());
            cdxWriter.writeHeaderLine();
+           cdxWriter.onWarning(System.err::println);
            cdxWriter.process(files, true);
         return stringWriter.toString();               
         }
@@ -219,7 +220,7 @@ public class CdxIndexerWorkflow {
 
     private static CdxFormat.Builder createCdxBuilder() {
         CdxFormat.Builder cdxFormatBuilder = new CdxFormat.Builder().        
-                digestUnchanged().        
+                digestUnchanged().                  
                 legend(CdxFormat.CDX11_LEGEND);
         return cdxFormatBuilder;
     }
