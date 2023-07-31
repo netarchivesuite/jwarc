@@ -3,6 +3,7 @@ package org.netpreserve.jwarc.workflows;
 import java.io.File;
 import java.io.IOException;
 import java.io.StringWriter;
+import java.lang.Runtime.Version;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -63,6 +64,7 @@ public class CdxIndexerWorkflow {
     private static HashSet<String> WARCS_COMPLETED= new HashSet <String>();
 
     public static void main(String[] args)  throws Exception{ 
+        checkJavaVersion();
         parseArguments(args); 
         try {
             init();            
@@ -83,6 +85,15 @@ public class CdxIndexerWorkflow {
             CdxIndexerWorkerThread  thread =  new CdxIndexerWorkflow().new CdxIndexerWorkerThread(cdxFormatBuilder,threadNumber);
             thread.start();
         }                  
+    }
+
+    private static void checkJavaVersion() {
+      String version = System.getProperty("java.version");
+      if (version.startsWith("8.0") || version.toString().startsWith("1.8")){
+          System.out.println("Must use java 11 or 17. Runtime version is:"+version);
+          System.exit(1);    
+      }
+      System.out.println("Java version is:"+version);  
     }
 
     private static void parseArguments(String[] args) {     
