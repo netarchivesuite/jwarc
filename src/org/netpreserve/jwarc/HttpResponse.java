@@ -53,7 +53,7 @@ public class HttpResponse extends HttpMessage {
         return parse(channel, copyTo, false, false);
     }
 
-    static HttpResponse parseWithoutBody(ReadableByteChannel channel, WritableByteChannel copyTo) throws IOException {
+    public static HttpResponse parseWithoutBody(ReadableByteChannel channel, WritableByteChannel copyTo) throws IOException {
         return parse(channel, copyTo, false, true);
     }
 
@@ -74,7 +74,6 @@ public class HttpResponse extends HttpMessage {
             copyTo.write(buffer.duplicate());
         }
         MessageHeaders headers = parser.headers();
-        long contentLength;
         MessageBody body;
         if (withoutBody) {
             body = MessageBody.empty();
@@ -85,8 +84,16 @@ public class HttpResponse extends HttpMessage {
             }
             body = chunkedBody;
         } else {
-            body = LengthedBody.createFromContentLength(channel, buffer, headers.first("Content-Length")
-                    .map(Long::parseLong).orElse(null));
+            Long contentLength;
+            try {
+                contentLength = headers.first("Content-Length")
+                        .map(Long::parseLong)
+                        .orElse(null);
+            } catch (NumberFormatException e) {
+                if (strict) throw new IOException("Invalid Content-Length header", e);
+                contentLength = null;
+            }
+            body = LengthedBody.createFromContentLength(channel, buffer, contentLength);
         }
         HttpResponse response = new HttpResponse(parser.status(), parser.reason(), parser.version(), headers, body);
         response.serializedHeader = headerBytes;
